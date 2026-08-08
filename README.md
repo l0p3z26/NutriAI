@@ -4,6 +4,20 @@ Registro de comidas con IA. Analiza tus platos por **foto** o **texto** con Goog
 
 > Hecho por **l0p3z.26** · [Portfolio](https://l0p3z26.github.io/portfolio)
 
+## ⬇️ Release (descargar la app)
+
+**👉 [Descargar el APK para Android](https://github.com/l0p3z26/NutriAI/releases/latest/download/NutriAI-1.0.0.apk)** — instálalo permitiendo "orígenes desconocidos".
+
+Todas las versiones: **[github.com/l0p3z26/NutriAI/releases](https://github.com/l0p3z26/NutriAI/releases)**
+
+## 💻 Código
+
+Todo el código fuente está en este repositorio:
+
+- **[`src/`](src/)** — la app (React): pantallas, componentes y librerías (`src/lib/`).
+- **[`android/`](android/)** — proyecto Android (Capacitor) y plugins nativos.
+- **[`electron/`](electron/)** — versión de escritorio.
+
 ## Características
 
 - 📷 **Análisis con IA** por foto o texto (calorías + macros).
