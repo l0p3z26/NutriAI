@@ -1,0 +1,22 @@
+{
+  "appId": "com.nutriai.app",
+  "appName": "NutriAI",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#06080F"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#06080F",
+      "showSpinner": false
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_default",
+      "iconColor": "#1BE5B0"
+    }
+  }
+}

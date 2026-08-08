@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del splash de arranque en frío. Debe coincidir con T.bg del
+         frontend (#06080F) para que no haya salto de color hasta la app. -->
+    <color name="splashBackground">#06080F</color>
+</resources>

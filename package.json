@@ -1,0 +1,85 @@
+{
+  "name": "nutriai",
+  "version": "1.0.0",
+  "description": "NutriAI - Registro de comidas con IA (Gemini)",
+  "author": "NutriAI",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c blue,green \"vite\" \"electron .\"",
+    "build:renderer": "vite build",
+    "dist": "npm run build:renderer && electron-builder",
+    "dist:win": "npm run build:renderer && electron-builder --win nsis portable",
+    "sync:android": "npm run build:renderer && cap sync android",
+    "apk": "npm run build:renderer && cap sync android && cd android && gradlew.bat assembleRelease && cd .. && node scripts/copy-apk.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/local-notifications": "^8.2.1",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@google/genai": "^2.16.0",
+    "dotenv": "^17.4.2",
+    "electron-store": "^11.0.2",
+    "lucide-react": "^1.29.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.5",
+    "concurrently": "^10.0.4",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
+    "vite": "^8.2.1"
+  },
+  "build": {
+    "appId": "com.nutriai.desktop",
+    "productName": "NutriAI",
+    "directories": {
+      "output": "versions"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "NutriAI-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "NutriAI-Portable-${version}.${ext}"
+    }
+  }
+}

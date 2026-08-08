@@ -1,0 +1,43 @@
+# ───────── Dependencias ─────────
+node_modules/
+
+# ───────── Salidas de compilación ─────────
+# .apk / .exe generados → distribúyelos como "Release" de GitHub, no en el repo.
+dist/
+release/
+versions/
+*.log
+npm-debug.log*
+
+# ───────── Archivos de trabajo (no forman parte de la app) ─────────
+NutriAI_v10.jsx
+icono2.png
+icono_nuevo.png
+diagnostico_final_notificaciones_nutriai.pdf
+
+# Excluido a petición del autor (OJO: Vite lo necesita como entry point para compilar).
+index.html
+
+# ───────── SECRETOS · ¡NUNCA subir! ─────────
+.env
+.env.*
+android/keystore.properties
+*.jks
+*.keystore
+google-services.json
+
+# ───────── Android (artefactos de build) ─────────
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/local.properties
+android/.idea/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+
+# ───────── IDE / Sistema operativo ─────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
