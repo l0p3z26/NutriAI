@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronLeft } from "lucide-react";
 import { T } from "../../theme.js";
 import { useT } from "../../lib/i18n.jsx";
@@ -21,8 +21,24 @@ export default function PantallaPerfil({ existente, onGuardar, onVolver }) {
   const [paso, setPaso] = useState(0);
   const [p, setP] = useState({ ...PERFIL_VACIO, ...(existente ?? {}) });
   const set = k => v => setP(prev => ({ ...prev, [k]: v }));
-  const hoyISO = new Date().toISOString().slice(0, 10);
   const edadActual = edadDesdeFecha(p.birthDate);
+
+  // Fecha de nacimiento ESCRITA (sin calendario): tres campos DD / MM / AAAA
+  // con salto automático al siguiente. birthDate se arma en formato ISO.
+  const iniBD = (existente?.birthDate || "").split("-");   // [yyyy, mm, dd]
+  const [dia, setDia]   = useState(iniBD[2] || "");
+  const [mes, setMes]   = useState(iniBD[1] || "");
+  const [anio, setAnio] = useState(iniBD[0] || "");
+  const mesRef  = useRef(null);
+  const anioRef = useRef(null);
+  const digs = (v, n) => v.replace(/\D/g, "").slice(0, n);
+  const inpBD = (w) => ({ width: w, textAlign: "center", padding: "11px 6px", background: T.s2, border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, fontSize: 16, fontWeight: 700, outline: "none", fontFamily: "'Sora',sans-serif" });
+
+  useEffect(() => {
+    const ok = dia.length >= 1 && mes.length >= 1 && anio.length === 4;
+    const iso = ok ? `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}` : "";
+    setP(prev => (prev.birthDate === iso ? prev : { ...prev, birthDate: iso }));
+  }, [dia, mes, anio]);
 
   const pasos = [
     {
@@ -33,9 +49,25 @@ export default function PantallaPerfil({ existente, onGuardar, onVolver }) {
         Number(p.heightCm) > 0 && Number(p.weightKg) > 0,
       contenido: (
         <>
-          <Campo etiqueta={t("perfil.fecha_nac")} v={p.birthDate} set={set("birthDate")} tipo="date" max={hoyISO} pista={t("perfil.fecha_nac_nota")} />
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: T.muted, fontWeight: 600, marginBottom: 5 }}>{t("perfil.fecha_nac")}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input inputMode="numeric" value={dia} placeholder="DD" aria-label="DD" maxLength={2}
+                onChange={(e) => { const d = digs(e.target.value, 2); setDia(d); if (d.length === 2) mesRef.current?.focus(); }}
+                style={inpBD(48)} />
+              <span style={{ fontSize: 18, fontWeight: 800, color: T.muted }}>/</span>
+              <input ref={mesRef} inputMode="numeric" value={mes} placeholder="MM" aria-label="MM" maxLength={2}
+                onChange={(e) => { const d = digs(e.target.value, 2); setMes(d); if (d.length === 2) anioRef.current?.focus(); }}
+                style={inpBD(48)} />
+              <span style={{ fontSize: 18, fontWeight: 800, color: T.muted }}>/</span>
+              <input ref={anioRef} inputMode="numeric" value={anio} placeholder="AAAA" aria-label="AAAA" maxLength={4}
+                onChange={(e) => setAnio(digs(e.target.value, 4))}
+                style={inpBD(72)} />
+            </div>
+            <div style={{ fontSize: 11, color: T.dim, marginTop: 5, lineHeight: 1.5 }}>{t("perfil.fecha_nac_nota")}</div>
+          </div>
           {p.birthDate && edadActual != null && (edadActual < 10 || edadActual > 100) && (
-            <div style={{ fontSize: 12, color: T.danger, margin: "-8px 0 12px" }}>{t("perfil.edad_rango")}</div>
+            <div style={{ fontSize: 12, color: T.danger, margin: "-4px 0 12px" }}>{t("perfil.edad_rango")}</div>
           )}
           <Selector etiqueta={t("perfil.sexo")} v={p.sex} set={set("sex")} opciones={[
             { v: "male", l: t("sexo.male") }, { v: "female", l: t("sexo.female") },

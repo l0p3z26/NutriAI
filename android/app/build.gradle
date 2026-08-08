@@ -18,7 +18,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // IMPORTANTE: sube versionCode (+1) en CADA release publicada, o Android
         // no reconocerá el APK nuevo como una actualización del anterior.
-        versionCode 24
+        versionCode 25
         versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

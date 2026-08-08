@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Globe, User, History, Code2, Check,
-  ChevronDown, ChevronUp, KeyRound, Smartphone, Bell, Trash2, Plus,
+  ChevronDown, ChevronUp, KeyRound, Smartphone, Bell, Trash2, Plus, Heart,
 } from "lucide-react";
 import { T } from "../../theme.js";
 import { useIdioma, useT, IDIOMAS, traducir } from "../../lib/i18n.jsx";
@@ -16,6 +16,8 @@ import OptimizacionAndroid from "../ui/OptimizacionAndroid.jsx";
 export const VERSION_APP = "1.0.0";
 const URL_PORTFOLIO = "https://l0p3z26.github.io/portfolio";
 const URL_GITHUB = "https://github.com/l0p3z26/NutriAI";
+// Enlace de donaciones (PayPal.Me del autor).
+const URL_PAYPAL = "https://paypal.me/DiegoL0pez";
 
 const VERSIONES = [
   { v: "1.0.0", tituloKey: "hist.1_0_0.titulo", cuerpoKey: "hist.1_0_0.cuerpo", nuevo: true },
@@ -337,6 +339,7 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
         {/* Sobre la aplicación */}
         <TituloSeccion>{t("ajustes.sobre")}</TituloSeccion>
         <Fila icono={<User size={22} />}    titulo={t("ajustes.dev")}       sub={t("ajustes.dev.sub")}    onClick={() => abrirEnlace(URL_PORTFOLIO)} />
+        <Fila icono={<Heart size={22} />}   titulo={t("ajustes.donar")}     sub={t("ajustes.donar.sub")}  onClick={() => abrirEnlace(URL_PAYPAL)} />
         <Fila icono={<History size={22} />} titulo={t("ajustes.historial")} sub={rango}                   onClick={() => setVista("historial")} />
         <Fila icono={<Code2 size={22} />}   titulo={t("ajustes.fuente")}    sub={t("ajustes.fuente.sub")} onClick={() => abrirEnlace(URL_GITHUB)} />
 

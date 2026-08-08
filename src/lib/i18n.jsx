@@ -166,6 +166,8 @@ export const STRINGS = {
   "ajustes.notif.sub":     { es: "Recordatorios para registrar tus comidas", en: "Reminders to log your meals", fr: "Rappels pour enregistrer tes repas", it: "Promemoria per registrare i pasti", pt: "Lembretes para registar as tuas refeições" },
   "ajustes.dev":           { es: "Desarrollador", en: "Developer", fr: "Développeur", it: "Sviluppatore", pt: "Programador" },
   "ajustes.dev.sub":       { es: "Visita su portfolio", en: "Visit their portfolio", fr: "Voir son portfolio", it: "Visita il suo portfolio", pt: "Visita o seu portfólio" },
+  "ajustes.donar":         { es: "Donaciones", en: "Donations", fr: "Dons", it: "Donazioni", pt: "Doações" },
+  "ajustes.donar.sub":     { es: "Si te gusta esta aplicación, me ayudarías con una donación", en: "If you like this app, a donation would help me out", fr: "Si tu aimes cette appli, un don m'aiderait beaucoup", it: "Se ti piace questa app, una donazione mi aiuterebbe", pt: "Se gostas desta aplicação, uma doação ajudava-me" },
   "ajustes.historial":     { es: "Historial de Versiones", en: "Version History", fr: "Historique des versions", it: "Cronologia versioni", pt: "Histórico de versões" },
   "ajustes.fuente":        { es: "Código Fuente", en: "Source Code", fr: "Code source", it: "Codice sorgente", pt: "Código-fonte" },
   "ajustes.fuente.sub":    { es: "Repositorio en GitHub", en: "GitHub repository", fr: "Dépôt sur GitHub", it: "Repository su GitHub", pt: "Repositório no GitHub" },
