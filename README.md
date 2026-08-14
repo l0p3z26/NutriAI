@@ -2,7 +2,7 @@
 
 Registro de comidas con IA. Analiza tus platos por **foto** o **texto** con Google Gemini y obtén calorías y macros al instante, con objetivos personalizados, recordatorios y seguimiento diario. App **Android** (Capacitor) con build de escritorio (Electron).
 
-> Hecho por **l0p3z.26** · [Portfolio](https://l0p3z26.github.io/portfolio)
+> Hecho por **Diego López** ([l0p3z26](https://github.com/l0p3z26)) · [Portfolio](https://l0p3z26.github.io/portfolio/)
 
 ## ⬇️ Release (descargar la app)
 
@@ -74,6 +74,15 @@ El APK sale en `android/app/build/outputs/apk/release/`. Para firmarlo como *rel
 
 Estos archivos **no** están en el repositorio (ver `.gitignore`) y **no** deben publicarse:
 `\.env`, `android/keystore.properties`, `*.jks` / `*.keystore`.
+
+## 👤 Autor
+
+**Diego López** — Inteligencia artificial, desarrollo de software y Técnico SMR. Creación de aplicaciones de escritorio, plataformas web, bots para Discord y herramientas adaptadas a cada proyecto.
+
+- 🌐 [Portfolio](https://l0p3z26.github.io/portfolio/)
+- 💻 [GitHub](https://github.com/l0p3z26)
+- 💼 [LinkedIn](https://linkedin.com/in/lopezmorante)
+- ❤️ [Donaciones (PayPal)](https://paypal.me/DiegoL0pez) — si NutriAI te resulta útil
 
 ## Aviso
 
