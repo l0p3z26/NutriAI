@@ -14,14 +14,15 @@ import {
 } from "../../lib/notificaciones.js";
 import OptimizacionAndroid from "../ui/OptimizacionAndroid.jsx";
 
-export const VERSION_APP = "1.5.0";
+export const VERSION_APP = "1.5.1";
 const URL_PORTFOLIO = "https://l0p3z26.github.io/portfolio";
 const URL_GITHUB = "https://github.com/l0p3z26/NutriAI";
 // Enlace de donaciones (PayPal.Me del autor).
 const URL_PAYPAL = "https://paypal.me/DiegoL0pez";
 
 const VERSIONES = [
-  { v: "1.5.0", tituloKey: "hist.1_5_0.titulo", cuerpoKey: "hist.1_5_0.cuerpo", nuevo: true },
+  { v: "1.5.1", tituloKey: "hist.1_5_1.titulo", cuerpoKey: "hist.1_5_1.cuerpo", nuevo: true },
+  { v: "1.5.0", tituloKey: "hist.1_5_0.titulo", cuerpoKey: "hist.1_5_0.cuerpo" },
   { v: "1.4.1", tituloKey: "hist.1_4_1.titulo", cuerpoKey: "hist.1_4_1.cuerpo" },
   { v: "1.4.0", tituloKey: "hist.1_4_0.titulo", cuerpoKey: "hist.1_4_0.cuerpo" },
   { v: "1.3.0", tituloKey: "hist.1_3_0.titulo", cuerpoKey: "hist.1_3_0.cuerpo" },
@@ -74,19 +75,6 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
   const { idioma, setIdioma } = useIdioma();
   const [vista, setVista] = useState("menu"); // "menu" | "idioma" | "historial"
   const [abierta, setAbierta] = useState("1.0.0");
-  // Nº de build (versionCode) para poder distinguir qué APK está instalado.
-  const [build, setBuild] = useState(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        if (window.Capacitor?.isNativePlatform?.()) {
-          const { App } = await import("@capacitor/app");
-          const info = await App.getInfo();
-          if (info?.build) setBuild(info.build);
-        }
-      } catch { /* no-op */ }
-    })();
-  }, []);
 
   // Selector de icono (solo Android): desplegable al final.
   const mostrarIconos = soportaCambioIcono();
@@ -262,7 +250,7 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
             const desplegada = abierta === ver.v;
             return (
               <div key={ver.v}
-                style={{ background: desplegada ? T.accentBg : T.surf, border: `1px solid ${desplegada ? T.accentBdr : T.border}`, borderRadius: 16, marginBottom: 12, overflow: "hidden" }}>
+                style={{ background: desplegada && ver.nuevo ? T.accentBg : T.surf, border: `1px solid ${desplegada && ver.nuevo ? T.accentBdr : T.border}`, borderRadius: 16, marginBottom: 12, overflow: "hidden" }}>
                 <button onClick={() => setAbierta(desplegada ? null : ver.v)}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer", padding: "14px 16px", textAlign: "left" }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: T.accent, background: T.s2, borderRadius: 8, padding: "4px 8px", flexShrink: 0 }}>v{ver.v}</span>
@@ -419,7 +407,7 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
             style={{ borderRadius: 22, boxShadow: `0 0 40px ${T.accent}22`, marginBottom: 14 }} />
           <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 26, fontWeight: 800, color: T.text }}>NutriAI</div>
           <div style={{ fontSize: 15, color: T.accent, fontWeight: 600, marginTop: 2 }}>{t("ajustes.por")} l0p3z.26</div>
-          <div style={{ fontSize: 13, color: T.muted, marginTop: 8 }}>{t("ajustes.version")} {VERSION_APP}{build ? ` (build ${build})` : ""}</div>
+          <div style={{ fontSize: 13, color: T.muted, marginTop: 8 }}>{t("ajustes.version")} {VERSION_APP}</div>
         </div>
 
         {/* Configuración */}
@@ -435,9 +423,9 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
         {/* Sobre la aplicación */}
         <TituloSeccion>{t("ajustes.sobre")}</TituloSeccion>
         <Fila icono={<User size={22} />}    titulo={t("ajustes.dev")}       sub={t("ajustes.dev.sub")}    onClick={() => abrirEnlace(URL_PORTFOLIO)} />
-        <Fila icono={<Heart size={22} />}   titulo={t("ajustes.donar")}     sub={t("ajustes.donar.sub")}  onClick={() => abrirEnlace(URL_PAYPAL)} />
         <Fila icono={<History size={22} />} titulo={t("ajustes.historial")} sub={rango}                   onClick={() => setVista("historial")} />
         <Fila icono={<Code2 size={22} />}   titulo={t("ajustes.fuente")}    sub={t("ajustes.fuente.sub")} onClick={() => abrirEnlace(URL_GITHUB)} />
+        <Fila icono={<Heart size={22} />}   titulo={t("ajustes.donar")}     sub={t("ajustes.donar.sub")}  onClick={() => abrirEnlace(URL_PAYPAL)} />
 
         {/* Icono de la app (desplegable, abajo del todo) — solo Android */}
         {mostrarIconos && (

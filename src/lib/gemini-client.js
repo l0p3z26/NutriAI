@@ -11,8 +11,8 @@
 // (mismos prompts, mismo esquema, mismo modelo). Si cambias uno, cambia el otro.
 import { GoogleGenAI } from "@google/genai";
 import {
-  getApiKeys, getActiveApiKey, getModelo,
-  esErrorDeClave, esErrorDeCuota, marcarAgotada, marcarInvalida,
+  getApiKeys, getActiveApiKey, getModelo, MODELOS_GEMINI, MODELO_PERSONALIZADO,
+  esErrorDeClave, esErrorDeCuota, esErrorDeModeloSaturado, marcarAgotada, marcarInvalida,
 } from "./apiKey.js";
 import { traducir, getInstruccionIdiomaIA } from "./i18n.jsx";
 
@@ -164,22 +164,50 @@ async function conRotacion(fn) {
   throw ultimo || new Error(traducir("err.todas_agotadas"));
 }
 
+// ── Cambio de modelo automático y silencioso (alta demanda) ─────────────────
+// El modelo predeterminado es SIEMPRE el que el usuario eligió en Ajustes →
+// Conectar IA (getModelo()). Pero si Google devuelve que ESE modelo está
+// saturado (503/UNAVAILABLE, no un problema de la clave), reintentamos la MISMA
+// petición con otro modelo del catálogo, sin avisar al usuario ni tocar su
+// preferencia guardada — solo afecta a esta llamada puntual. Se aplica a TODAS
+// las llamadas con salida estructurada: Análisis, Comidas frecuentes (reusa
+// analizarComida), Despensa, Crear comidas y Entrenador.
+async function conFallbackModelo(ejecutar) {
+  const elegido = await getModelo();
+  const otros = MODELOS_GEMINI.map((m) => m.v).filter((v) => v !== elegido && v !== MODELO_PERSONALIZADO);
+  const candidatos = [elegido, ...otros];
+  let ultimo = null;
+  for (const modelo of candidatos) {
+    try {
+      return await ejecutar(modelo);
+    } catch (e) {
+      ultimo = e;
+      if (esErrorDeModeloSaturado(e) && modelo !== candidatos[candidatos.length - 1]) {
+        console.warn(`[NutriAI] Modelo "${modelo}" saturado, probando con otro en silencio…`);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw ultimo;
+}
+
 async function llamarGeminiJSON({ systemPrompt, parts, schema, maxOutputTokens = 2048 }) {
-  const modelo = await getModelo();
-  const response = await conRotacion((ai) => ai.models.generateContent({
+  const config = {
+    // Directiva de idioma para que la IA responda en el idioma del usuario.
+    systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
+    responseMimeType: "application/json",
+    responseSchema: schema,
+    maxOutputTokens,
+    // NB: NO fijamos thinkingConfig. Los modelos Gemini 3.x rechazan
+    // (INVALID_ARGUMENT) desactivar el "thinking" (budget 0) cuando se pide
+    // salida estructurada (responseSchema). Dejamos que el modelo decida.
+  };
+  const response = await conFallbackModelo((modelo) => conRotacion((ai) => ai.models.generateContent({
     model: modelo,
     contents: [{ role: "user", parts }],
-    config: {
-      // Directiva de idioma para que la IA responda en el idioma del usuario.
-      systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
-      responseMimeType: "application/json",
-      responseSchema: schema,
-      maxOutputTokens,
-      // NB: NO fijamos thinkingConfig. Los modelos Gemini 3.x rechazan
-      // (INVALID_ARGUMENT) desactivar el "thinking" (budget 0) cuando se pide
-      // salida estructurada (responseSchema). Dejamos que el modelo decida.
-    },
-  }));
+    config,
+  })));
 
   const texto = response.text;
   const finishReason = response.candidates?.[0]?.finishReason;
@@ -213,18 +241,19 @@ const COACH_SCHEMA = {
 
 // `contents` es el historial multi-turno de Gemini: [{ role:"user"|"model", parts:[{text}] }].
 export async function chatCoach({ systemPrompt, contents, maxOutputTokens = 1024 }) {
-  const modelo = await getModelo();
-  const response = await conRotacion((ai) => ai.models.generateContent({
+  const config = {
+    systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
+    responseMimeType: "application/json",
+    responseSchema: COACH_SCHEMA,
+    maxOutputTokens,
+    // Sin thinkingConfig: Gemini 3.x rechaza budget 0 con salida estructurada.
+  };
+  // El entrenador SIEMPRE admite el cambio silencioso de modelo por alta demanda.
+  const response = await conFallbackModelo((modelo) => conRotacion((ai) => ai.models.generateContent({
     model: modelo,
     contents,
-    config: {
-      systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
-      responseMimeType: "application/json",
-      responseSchema: COACH_SCHEMA,
-      maxOutputTokens,
-      // Sin thinkingConfig: Gemini 3.x rechaza budget 0 con salida estructurada.
-    },
-  }));
+    config,
+  })));
 
   const texto = response.text;
   const finishReason = response.candidates?.[0]?.finishReason;

@@ -135,6 +135,18 @@ export function esErrorDeCuota(e) {
   return m.includes("quota") || m.includes("rate") || m.includes("429") || m.includes("resource_exhausted");
 }
 
+// ¿El error es porque el MODELO está saturado/con mucha demanda (503 UNAVAILABLE
+// de Google), a diferencia de la cuota de LA CLAVE (esErrorDeCuota)? Aquí rotar
+// de clave no sirve de nada: hay que probar con otro modelo. Se usa para el
+// cambio automático y silencioso de modelo en Análisis y Entrenador.
+export function esErrorDeModeloSaturado(e) {
+  const m = (e?.message || String(e) || "").toLowerCase();
+  return (
+    m.includes("overloaded") || m.includes("unavailable") || m.includes("503") ||
+    m.includes("high demand") || m.includes("capacity")
+  );
+}
+
 // Traduce un error crudo de la API a un mensaje claro en el idioma del usuario.
 export function traducirError(e) {
   const m = (e?.message || String(e) || "").toLowerCase();
@@ -148,6 +160,9 @@ export function traducirError(e) {
   }
   if (m.includes("invalid argument") || m.includes("invalid_argument") || m.includes("\"code\":400") || m.includes("code: 400")) {
     return traducir("err.modelo_incompatible");
+  }
+  if (esErrorDeModeloSaturado(e)) {
+    return traducir("err.modelos_saturados");
   }
   if (m.includes("quota") || m.includes("rate") || m.includes("429") || m.includes("resource_exhausted")) {
     return traducir("err.sin_cuota");
