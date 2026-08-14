@@ -365,11 +365,11 @@ export const STRINGS = {
   },
   "hist.1_5_1.titulo":     { es: "Respuestas más fiables", en: "More reliable responses", fr: "Réponses plus fiables", it: "Risposte più affidabili", pt: "Respostas mais fiáveis" },
   "hist.1_5_1.cuerpo": {
-    es: "• Más fiabilidad: si el modelo de IA tiene mucha demanda, la app cambia de modelo sola para que sigas recibiendo respuesta (Análisis, Comidas frecuentes, Despensa, Crear comidas y Entrenador).\n• Ajustes ahora muestra solo el número de versión, sin el número de build interno.",
-    en: "• More reliable: if the AI model is under heavy demand, the app switches models on its own so you still get a response (Analysis, Frequent meals, Pantry, Create meals and Coach).\n• Settings now shows only the version number, without the internal build number.",
-    fr: "• Plus fiable : si le modèle d'IA est très sollicité, l'app change de modèle toute seule pour que tu reçoives quand même une réponse (Analyse, Repas fréquents, Garde-manger, Créer des repas et Coach).\n• Réglages n'affiche plus que le numéro de version, sans le numéro de build interne.",
-    it: "• Più affidabile: se il modello di IA ha molta richiesta, l'app cambia modello da sola così ricevi comunque una risposta (Analisi, Pasti frequenti, Dispensa, Crea pasti e Coach).\n• Impostazioni ora mostra solo il numero di versione, senza il numero di build interno.",
-    pt: "• Mais fiável: se o modelo de IA estiver com muita procura, a app muda de modelo sozinha para continuares a receber resposta (Análise, Refeições frequentes, Despensa, Criar refeições e Treinador).\n• Definições agora mostra apenas o número de versão, sem o número de build interno.",
+    es: "• Más fiabilidad: si el modelo de IA tiene mucha demanda, la app cambia de modelo sola para que sigas recibiendo respuesta (Análisis, Comidas frecuentes, Despensa, Crear comidas y Entrenador).",
+    en: "• More reliable: if the AI model is under heavy demand, the app switches models on its own so you still get a response (Analysis, Frequent meals, Pantry, Create meals and Coach).",
+    fr: "• Plus fiable : si le modèle d'IA est très sollicité, l'app change de modèle toute seule pour que tu reçoives quand même une réponse (Analyse, Repas fréquents, Garde-manger, Créer des repas et Coach).",
+    it: "• Più affidabile: se il modello di IA ha molta richiesta, l'app cambia modello da sola così ricevi comunque una risposta (Analisi, Pasti frequenti, Dispensa, Crea pasti e Coach).",
+    pt: "• Mais fiável: se o modelo de IA estiver com muita procura, a app muda de modelo sozinha para continuares a receber resposta (Análise, Refeições frequentes, Despensa, Criar refeições e Treinador).",
   },
 
   // ── Bienvenida (onboarding) ──
