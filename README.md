@@ -6,7 +6,7 @@ Registro de comidas con IA. Analiza tus platos por **foto** o **texto** con Goog
 
 ## ⬇️ Release (descargar la app)
 
-**👉 [Descargar el APK para Android](https://github.com/l0p3z26/NutriAI/releases/latest/download/NutriAI-1.0.0.apk)** — instálalo permitiendo "orígenes desconocidos".
+**👉 [Descargar el APK para Android](https://github.com/l0p3z26/NutriAI/releases/latest/download/NutriAI-1.5.0.apk)** — instálalo permitiendo "orígenes desconocidos".
 
 Todas las versiones: **[github.com/l0p3z26/NutriAI/releases](https://github.com/l0p3z26/NutriAI/releases)**
 
