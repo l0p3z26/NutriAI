@@ -74,7 +74,9 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
   const t = useT();
   const { idioma, setIdioma } = useIdioma();
   const [vista, setVista] = useState("menu"); // "menu" | "idioma" | "historial"
-  const [abierta, setAbierta] = useState("1.0.0");
+  // VERSIONES[0] es siempre la más nueva (se añade al principio en cada release),
+  // así que esto no hay que tocarlo a mano en cada versión.
+  const [abierta, setAbierta] = useState(VERSIONES[0]?.v || null);
 
   // Selector de icono (solo Android): desplegable al final.
   const mostrarIconos = soportaCambioIcono();
