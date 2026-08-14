@@ -192,6 +192,17 @@ async function conFallbackModelo(ejecutar) {
   throw ultimo;
 }
 
+// Si Gemini corta la respuesta a mitad de generar el JSON (p. ej. por gastar el
+// límite de tokens "pensando" antes de escribir, y quedarse sin margen para
+// terminar), JSON.parse falla. En vez de enseñarle al usuario el JSON crudo
+// (p. ej. `{"reply":"¡Hola! Hoy te has qued`), rescatamos a mano el contenido
+// de "reply" con una regex tolerante a que falte la comilla de cierre.
+export function rescatarReply(texto) {
+  const m = String(texto || "").match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (!m) return texto;
+  return m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
 async function llamarGeminiJSON({ systemPrompt, parts, schema, maxOutputTokens = 2048 }) {
   const config = {
     // Directiva de idioma para que la IA responda en el idioma del usuario.
@@ -240,7 +251,7 @@ const COACH_SCHEMA = {
 };
 
 // `contents` es el historial multi-turno de Gemini: [{ role:"user"|"model", parts:[{text}] }].
-export async function chatCoach({ systemPrompt, contents, maxOutputTokens = 1024 }) {
+export async function chatCoach({ systemPrompt, contents, maxOutputTokens = 2048 }) {
   const config = {
     systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
     responseMimeType: "application/json",
@@ -269,8 +280,9 @@ export async function chatCoach({ systemPrompt, contents, maxOutputTokens = 1024
       social_meal_today: !!o.social_meal_today,
     };
   } catch {
-    // Si por lo que sea no vino JSON válido, usamos el texto crudo como respuesta.
-    return { reply: texto, memory_add: [], social_meal_today: false };
+    // JSON inválido/cortado: rescatamos el "reply" a mano en vez de enseñar el
+    // JSON crudo al usuario.
+    return { reply: rescatarReply(texto), memory_add: [], social_meal_today: false };
   }
 }
 

@@ -7,7 +7,7 @@
 //   · si arrastra un PATRÓN de comidas sociales esta semana (para ser firme).
 // La IA no se reentrena: todo es contexto. Cambiar de clave NO pierde nada,
 // porque la memoria vive en el dispositivo.
-import { chatCoach } from "./gemini-client.js";
+import { chatCoach, rescatarReply } from "./gemini-client.js";
 import { calcConsumido } from "./nutrition.js";
 import { sg, ss, KEYS } from "./storage.js";
 import { traducir } from "./i18n.jsx";
@@ -115,6 +115,10 @@ function tituloDesde(texto) {
   return t.length > 40 ? `${t.slice(0, 40)}…` : t;
 }
 
+// ¿Un texto guardado quedó con el JSON crudo sin parsear (bug histórico de
+// respuestas cortadas a mitad de generar)? P. ej. `{"reply":"¡Hola!...`.
+const pareceJsonRoto = (t) => typeof t === "string" && t.trimStart().startsWith('{"reply"');
+
 export async function getConversaciones() {
   let l = await sg(KEYS.CHATS);
   if (!Array.isArray(l)) l = [];
@@ -127,6 +131,16 @@ export async function getConversaciones() {
       await ss(KEYS.CHAT, []);
     }
   }
+
+  // Repara mensajes del entrenador ya guardados con el JSON crudo (una vez).
+  let reparado = false;
+  for (const c of l) {
+    for (const m of c.mensajes || []) {
+      if (m.rol === "coach" && pareceJsonRoto(m.texto)) { m.texto = rescatarReply(m.texto); reparado = true; }
+    }
+  }
+  if (reparado) await ss(KEYS.CHATS, l);
+
   return l.slice().sort((a, b) => (b.actualizado || 0) - (a.actualizado || 0));
 }
 
@@ -238,7 +252,7 @@ export async function prepararEntrenador({ perfil, objetivos }) {
     { role: "user", parts: [{ text: instruccion }] },
   ];
 
-  const res = await chatCoach({ systemPrompt: `${SYSTEM_COACH}\n\n${contexto}`, contents, maxOutputTokens: 500 });
+  const res = await chatCoach({ systemPrompt: `${SYSTEM_COACH}\n\n${contexto}`, contents, maxOutputTokens: 1500 });
   if (res.memory_add?.length) await anadirNotas(res.memory_add);
 
   // Sembramos el saludo como una conversación de bienvenida (si aún no hay ninguna).
@@ -255,7 +269,16 @@ export async function prepararEntrenador({ perfil, objetivos }) {
 // Cada uno: { id, fecha, texto, ts }.
 export async function getResumenes() {
   const l = await sg(KEYS.RESUMENES);
-  return Array.isArray(l) ? l.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  const arr = Array.isArray(l) ? l : [];
+
+  // Repara resúmenes ya guardados con el JSON crudo (una vez).
+  let reparado = false;
+  for (const r of arr) {
+    if (pareceJsonRoto(r.texto)) { r.texto = rescatarReply(r.texto); reparado = true; }
+  }
+  if (reparado) await ss(KEYS.RESUMENES, arr);
+
+  return arr.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
 }
 async function guardarResumenes(l) {
   const ordenados = l.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 60);
@@ -290,7 +313,7 @@ export async function generarResumenDiario({ perfil, objetivos, comidasHoy }) {
 
   const contents = [{ role: "user", parts: [{ text: instruccion }] }];
 
-  const res = await chatCoach({ systemPrompt: `${SYSTEM_COACH}\n\n${contexto}`, contents, maxOutputTokens: 700 });
+  const res = await chatCoach({ systemPrompt: `${SYSTEM_COACH}\n\n${contexto}`, contents, maxOutputTokens: 2000 });
   if (res.memory_add?.length) await anadirNotas(res.memory_add);
 
   const resumen = { id: nuevoId(), fecha: new Date().toLocaleDateString(), texto: res.reply, ts: Date.now() };

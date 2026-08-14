@@ -14,14 +14,15 @@ import {
 } from "../../lib/notificaciones.js";
 import OptimizacionAndroid from "../ui/OptimizacionAndroid.jsx";
 
-export const VERSION_APP = "1.5.1";
+export const VERSION_APP = "1.5.2";
 const URL_PORTFOLIO = "https://l0p3z26.github.io/portfolio";
 const URL_GITHUB = "https://github.com/l0p3z26/NutriAI";
 // Enlace de donaciones (PayPal.Me del autor).
 const URL_PAYPAL = "https://paypal.me/DiegoL0pez";
 
 const VERSIONES = [
-  { v: "1.5.1", tituloKey: "hist.1_5_1.titulo", cuerpoKey: "hist.1_5_1.cuerpo", nuevo: true },
+  { v: "1.5.2", tituloKey: "hist.1_5_2.titulo", cuerpoKey: "hist.1_5_2.cuerpo", nuevo: true },
+  { v: "1.5.1", tituloKey: "hist.1_5_1.titulo", cuerpoKey: "hist.1_5_1.cuerpo" },
   { v: "1.5.0", tituloKey: "hist.1_5_0.titulo", cuerpoKey: "hist.1_5_0.cuerpo" },
   { v: "1.4.1", tituloKey: "hist.1_4_1.titulo", cuerpoKey: "hist.1_4_1.cuerpo" },
   { v: "1.4.0", tituloKey: "hist.1_4_0.titulo", cuerpoKey: "hist.1_4_0.cuerpo" },

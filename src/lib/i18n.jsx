@@ -371,6 +371,14 @@ export const STRINGS = {
     it: "• Più affidabile: se il modello di IA ha molta richiesta, l'app cambia modello da sola così ricevi comunque una risposta (Analisi, Pasti frequenti, Dispensa, Crea pasti e Coach).",
     pt: "• Mais fiável: se o modelo de IA estiver com muita procura, a app muda de modelo sozinha para continuares a receber resposta (Análise, Refeições frequentes, Despensa, Criar refeições e Treinador).",
   },
+  "hist.1_5_2.titulo":     { es: "Arreglo del entrenador", en: "Coach fix", fr: "Correction du coach", it: "Correzione del coach", pt: "Correção do treinador" },
+  "hist.1_5_2.cuerpo": {
+    es: "• Arreglado: si la respuesta del entrenador se cortaba a mitad de generar, a veces se guardaba el texto técnico en bruto en vez del mensaje. Ahora se rescata el mensaje real, y se han reparado tus notificaciones y chats ya guardados.\n• Más margen de respuesta para el entrenador, para que esto pase con menos frecuencia.",
+    en: "• Fixed: if the coach's reply got cut off mid-generation, the raw technical text was sometimes saved instead of the message. The real message is now rescued, and your already-saved notifications/chats have been repaired.\n• More response headroom for the coach, so this happens less often.",
+    fr: "• Corrigé : si la réponse du coach était coupée en cours de génération, le texte technique brut était parfois enregistré à la place du message. Le vrai message est désormais récupéré, et tes notifications/discussions déjà enregistrées ont été réparées.\n• Plus de marge de réponse pour le coach, pour que cela arrive moins souvent.",
+    it: "• Corretto: se la risposta del coach veniva interrotta a metà generazione, a volte veniva salvato il testo tecnico grezzo invece del messaggio. Ora il messaggio reale viene recuperato, e le tue notifiche/chat già salvate sono state riparate.\n• Più margine di risposta per il coach, così questo capita meno spesso.",
+    pt: "• Corrigido: se a resposta do treinador era cortada a meio da geração, às vezes guardava-se o texto técnico em bruto em vez da mensagem. Agora a mensagem real é recuperada, e as tuas notificações/conversas já guardadas foram reparadas.\n• Mais margem de resposta para o treinador, para que isto aconteça com menos frequência.",
+  },
 
   // ── Bienvenida (onboarding) ──
   "bienvenida.titulo": { es: "Registra tu comida con IA", en: "Track your food with AI", fr: "Suis tes repas avec l’IA", it: "Registra i tuoi pasti con l’IA", pt: "Regista a tua comida com IA" },

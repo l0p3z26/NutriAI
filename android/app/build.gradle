@@ -18,8 +18,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // IMPORTANTE: sube versionCode (+1) en CADA release publicada, o Android
         // no reconocerá el APK nuevo como una actualización del anterior.
-        versionCode 47
-        versionName "1.5.1"
+        versionCode 48
+        versionName "1.5.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
