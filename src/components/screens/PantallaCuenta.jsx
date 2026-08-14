@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
 import {
   ChevronLeft, User, Edit3, DatabaseBackup, Download, Upload,
-  CheckCircle2, AlertCircle, ShieldCheck,
+  CheckCircle2, AlertCircle, ShieldCheck, Check, KeyRound,
 } from "lucide-react";
 import { T, fmt } from "../../theme.js";
 import { useT, useIdioma } from "../../lib/i18n.jsx";
 import Boton from "../ui/Boton.jsx";
-import { exportarBackup, leerArchivoBackup, restaurarBackup } from "../../lib/backup.js";
+import {
+  exportarBackup, leerArchivoBackup, restaurarBackup,
+  CATEGORIAS, seleccionPorDefecto,
+} from "../../lib/backup.js";
 
 function Insignia({ children, tono = T.accent }) {
   return (
@@ -43,12 +46,17 @@ export default function PantallaCuenta({ perfil, objetivos, onEditar, onVolver, 
   const [msg, setMsg] = useState(null);
   const [pendiente, setPendiente] = useState(null);
   const [ocupado, setOcupado] = useState(false);
+  const [seleccion, setSeleccion] = useState(seleccionPorDefecto());
   const fileRef = useRef(null);
 
+  const alternar = (id) => setSeleccion((s) => ({ ...s, [id]: !s[id] }));
+  const algoSeleccionado = Object.values(seleccion).some(Boolean);
+
   const exportar = async () => {
+    if (!algoSeleccionado) return;
     setMsg(null); setOcupado(true);
     try {
-      const r = await exportarBackup();
+      const r = await exportarBackup(seleccion);
       setMsg({ tipo: "ok", texto: r.via === "download" ? t("cuenta.msg.descarga") : t("cuenta.msg.elige") });
     } catch {
       setMsg({ tipo: "error", texto: t("cuenta.msg.export_err") });
@@ -173,8 +181,48 @@ export default function PantallaCuenta({ perfil, objetivos, onEditar, onVolver, 
             </div>
           )}
 
+          {/* Selección de qué exportar (casillas) */}
+          {!pendiente && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12.5, color: T.accent, fontWeight: 700, marginBottom: 8, paddingLeft: 2 }}>{t("cuenta.que_exportar")}</div>
+              {CATEGORIAS.map((cat) => {
+                const activo = !!seleccion[cat.id];
+                return (
+                  <button key={cat.id} onClick={() => alternar(cat.id)}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 12,
+                      background: T.s2, border: `1px solid ${activo ? (cat.sensible ? T.warn + "88" : T.accentBdr) : T.border}`,
+                      borderRadius: 12, padding: "11px 14px", cursor: "pointer", textAlign: "left", marginBottom: 8,
+                    }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 7, flexShrink: 0,
+                      background: activo ? (cat.sensible ? T.warn : T.accent) : "transparent",
+                      border: `1.5px solid ${activo ? (cat.sensible ? T.warn : T.accent) : T.dim}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {activo && <Check size={14} color="#06080F" />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: T.text, display: "flex", alignItems: "center", gap: 6 }}>
+                        {cat.sensible && <KeyRound size={13} color={T.warn} />}
+                        {t(`cuenta.cat.${cat.id}`)}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: T.muted, marginTop: 1 }}>{t(`cuenta.cat.${cat.id}.sub`)}</div>
+                    </div>
+                  </button>
+                );
+              })}
+              {seleccion.claves && (
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: T.warnBg, border: `1px solid ${T.warn}44`, borderRadius: 10, padding: "9px 12px", marginTop: 2 }}>
+                  <AlertCircle size={14} color={T.warn} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <p style={{ fontSize: 11.5, color: T.warn, lineHeight: 1.5 }}>{t("cuenta.cat.claves_aviso")}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <Boton variante="primario" onClick={exportar} disabled={ocupado} icono={<Download size={15} />}>
+            <Boton variante="primario" onClick={exportar} disabled={ocupado || !algoSeleccionado} icono={<Download size={15} />}>
               {ocupado ? t("cuenta.exportando") : t("cuenta.exportar")}
             </Boton>
             <Boton variante="ghost" onClick={() => fileRef.current?.click()} icono={<Upload size={15} />}>

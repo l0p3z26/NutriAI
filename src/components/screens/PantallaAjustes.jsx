@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Globe, User, History, Code2, Check,
-  ChevronDown, ChevronUp, KeyRound, Smartphone, Bell, Trash2, Plus, Heart,
+  ChevronDown, ChevronUp, KeyRound, Smartphone, Bell, Trash2, Plus, Heart, Dumbbell,
 } from "lucide-react";
 import { T } from "../../theme.js";
 import { useIdioma, useT, IDIOMAS, traducir } from "../../lib/i18n.jsx";
@@ -10,17 +10,25 @@ import { ICONOS, ICONO_POR_DEFECTO, getIconoActual, cambiarIcono, soportaCambioI
 import {
   soportaNotificaciones, getConfigNotif, setConfigNotif, reprogramar,
   permisoConcedido, pedirPermiso, abrirAjustesNotif,
+  getConfigCoach, setConfigCoach, reprogramarCoach,
 } from "../../lib/notificaciones.js";
 import OptimizacionAndroid from "../ui/OptimizacionAndroid.jsx";
 
-export const VERSION_APP = "1.0.0";
+export const VERSION_APP = "1.5.0";
 const URL_PORTFOLIO = "https://l0p3z26.github.io/portfolio";
 const URL_GITHUB = "https://github.com/l0p3z26/NutriAI";
 // Enlace de donaciones (PayPal.Me del autor).
 const URL_PAYPAL = "https://paypal.me/DiegoL0pez";
 
 const VERSIONES = [
-  { v: "1.0.0", tituloKey: "hist.1_0_0.titulo", cuerpoKey: "hist.1_0_0.cuerpo", nuevo: true },
+  { v: "1.5.0", tituloKey: "hist.1_5_0.titulo", cuerpoKey: "hist.1_5_0.cuerpo", nuevo: true },
+  { v: "1.4.1", tituloKey: "hist.1_4_1.titulo", cuerpoKey: "hist.1_4_1.cuerpo" },
+  { v: "1.4.0", tituloKey: "hist.1_4_0.titulo", cuerpoKey: "hist.1_4_0.cuerpo" },
+  { v: "1.3.0", tituloKey: "hist.1_3_0.titulo", cuerpoKey: "hist.1_3_0.cuerpo" },
+  { v: "1.2.0", tituloKey: "hist.1_2_0.titulo", cuerpoKey: "hist.1_2_0.cuerpo" },
+  { v: "1.1.0", tituloKey: "hist.1_1_0.titulo", cuerpoKey: "hist.1_1_0.cuerpo" },
+  { v: "1.0.1", tituloKey: "hist.1_0_1.titulo", cuerpoKey: "hist.1_0_1.cuerpo" },
+  { v: "1.0.0", tituloKey: "hist.1_0_0.titulo", cuerpoKey: "hist.1_0_0.cuerpo" },
 ];
 
 const abrirEnlace = (url) => {
@@ -66,6 +74,19 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
   const { idioma, setIdioma } = useIdioma();
   const [vista, setVista] = useState("menu"); // "menu" | "idioma" | "historial"
   const [abierta, setAbierta] = useState("1.0.0");
+  // Nº de build (versionCode) para poder distinguir qué APK está instalado.
+  const [build, setBuild] = useState(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (window.Capacitor?.isNativePlatform?.()) {
+          const { App } = await import("@capacitor/app");
+          const info = await App.getInfo();
+          if (info?.build) setBuild(info.build);
+        }
+      } catch { /* no-op */ }
+    })();
+  }, []);
 
   // Selector de icono (solo Android): desplegable al final.
   const mostrarIconos = soportaCambioIcono();
@@ -82,6 +103,12 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
   const [nuevaM, setNuevaM] = useState("");   // minuto escrito (MM)
   const minutoRef = useRef(null);             // para saltar auto de HH a MM
 
+  // Resumen diario del entrenador (notificación propia).
+  const [coachCfg, setCoachCfg] = useState(null);
+  const [coachH, setCoachH] = useState("");
+  const [coachM, setCoachM] = useState("");
+  const coachMinRef = useRef(null);
+
   // Cargamos siempre el icono activo para que el logo de esta pantalla coincida
   // con el icono elegido por el usuario (aunque el selector no se muestre).
   useEffect(() => { getIconoActual().then(setIconoActual); }, []);
@@ -92,8 +119,38 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
       const cfg = await getConfigNotif();
       setNotifCfg(cfg);
       setNotifPermiso(await permisoConcedido());
+      const cc = await getConfigCoach();
+      setCoachCfg(cc);
+      setCoachH(String(cc.h).padStart(2, "0"));
+      setCoachM(String(cc.m).padStart(2, "0"));
     })();
   }, [mostrarNotif]);
+
+  // Aplica y persiste la config del resumen diario del entrenador.
+  const aplicarCoach = async (nueva) => {
+    setCoachCfg(nueva);
+    await setConfigCoach(nueva);
+    await reprogramarCoach(nueva);
+  };
+
+  const toggleCoach = async () => {
+    if (!coachCfg) return;
+    const activar = !coachCfg.activado;
+    if (activar && !notifPermiso) {
+      const ok = await pedirPermiso();
+      setNotifPermiso(ok);
+      if (!ok) return;
+    }
+    aplicarCoach({ ...coachCfg, activado: activar });
+  };
+
+  const guardarHoraCoach = () => {
+    if (!coachCfg) return;
+    const h = parseInt(coachH, 10), m = parseInt(coachM, 10);
+    if (!(Number.isInteger(h) && h >= 0 && h <= 23 && Number.isInteger(m) && m >= 0 && m <= 59)) return;
+    aplicarCoach({ ...coachCfg, h, m });
+  };
+
 
   const abrirAjustesAndroid = async () => { await abrirAjustesNotif(); };
 
@@ -299,6 +356,45 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
             <Smartphone size={15} /> {t("notif.abrir_ajustes")}
           </button>
 
+          {/* Resumen diario del entrenador personal */}
+          {coachCfg && (
+            <div style={{ marginTop: 24 }}>
+              <TituloSeccion>{t("notif.coach_seccion")}</TituloSeccion>
+              <p style={{ fontSize: 12.5, color: T.muted, lineHeight: 1.55, margin: "0 0 12px" }}>{t("notif.coach_sub")}</p>
+
+              <button onClick={toggleCoach}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 14, padding: "14px 16px", cursor: "pointer", marginBottom: 12 }}>
+                <div style={{ color: T.accent, display: "flex" }}><Dumbbell size={22} /></div>
+                <div style={{ flex: 1, textAlign: "left", fontSize: 15.5, fontWeight: 700, color: T.text }}>{t("notif.coach_activar")}</div>
+                <div style={{ width: 46, height: 27, borderRadius: 99, background: coachCfg.activado ? T.accent : T.s3, border: `1px solid ${coachCfg.activado ? T.accent : T.border}`, position: "relative", transition: "background .2s", flexShrink: 0 }}>
+                  <div style={{ position: "absolute", top: 2, left: coachCfg.activado ? 21 : 2, width: 21, height: 21, borderRadius: 99, background: coachCfg.activado ? "#06080F" : T.muted, transition: "left .2s" }} />
+                </div>
+              </button>
+
+              {coachCfg.activado && (
+                <>
+                  <div style={{ fontSize: 13, color: T.muted, marginBottom: 8 }}>{t("notif.coach_hora")}</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input type="text" inputMode="numeric" value={coachH} maxLength={2} placeholder="HH" aria-label="HH"
+                      onChange={(e) => { const d = soloDig(e.target.value); setCoachH(d); if (d.length === 2) coachMinRef.current?.focus(); }}
+                      onBlur={guardarHoraCoach}
+                      style={{ width: 58, textAlign: "center", padding: "11px 8px", background: T.s2, border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, fontSize: 16, fontWeight: 700, outline: "none", fontFamily: "'Sora',sans-serif" }} />
+                    <span style={{ fontSize: 18, fontWeight: 800, color: T.muted }}>:</span>
+                    <input ref={coachMinRef} type="text" inputMode="numeric" value={coachM} maxLength={2} placeholder="MM" aria-label="MM"
+                      onChange={(e) => setCoachM(soloDig(e.target.value))}
+                      onBlur={guardarHoraCoach}
+                      style={{ width: 58, textAlign: "center", padding: "11px 8px", background: T.s2, border: `1px solid ${T.border}`, borderRadius: 10, color: T.text, fontSize: 16, fontWeight: 700, outline: "none", fontFamily: "'Sora',sans-serif" }} />
+                    <button onClick={guardarHoraCoach}
+                      style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: T.accent, color: "#06080F", border: "none", borderRadius: 10, padding: "11px 12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                      <Check size={16} /> {t("notif.coach_guardar")}
+                    </button>
+                  </div>
+                </>
+              )}
+
+            </div>
+          )}
+
           {/* Optimización del sistema: inicio automático + batería sin restricciones */}
           <div style={{ marginTop: 24 }}>
             <TituloSeccion>{t("optim.seccion")}</TituloSeccion>
@@ -323,7 +419,7 @@ export default function PantallaAjustes({ onVolver, onConexion }) {
             style={{ borderRadius: 22, boxShadow: `0 0 40px ${T.accent}22`, marginBottom: 14 }} />
           <div style={{ fontFamily: "'Sora',sans-serif", fontSize: 26, fontWeight: 800, color: T.text }}>NutriAI</div>
           <div style={{ fontSize: 15, color: T.accent, fontWeight: 600, marginTop: 2 }}>{t("ajustes.por")} l0p3z.26</div>
-          <div style={{ fontSize: 13, color: T.muted, marginTop: 8 }}>{t("ajustes.version")} {VERSION_APP}</div>
+          <div style={{ fontSize: 13, color: T.muted, marginTop: 8 }}>{t("ajustes.version")} {VERSION_APP}{build ? ` (build ${build})` : ""}</div>
         </div>
 
         {/* Configuración */}

@@ -1,6 +1,7 @@
 package com.nutriai.app;
 
 import android.Manifest;
+import android.content.Intent;
 import android.os.Build;
 
 import androidx.core.app.NotificationManagerCompat;
@@ -23,6 +24,26 @@ import com.getcapacitor.annotation.PermissionCallback;
     permissions = @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "display")
 )
 public class RecordatoriosPlugin extends Plugin {
+
+    // Si la app se abre tocando la notificación del entrenador, el intent trae
+    // EXTRA_ABRIR_CHAT: lo detectamos aquí (arranque en frío y app ya abierta) y
+    // lo dejamos como flag para que el WebView navegue al chat al reanudar.
+    @Override
+    public void load() {
+        marcarSiAbrirChat(getActivity() != null ? getActivity().getIntent() : null);
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        marcarSiAbrirChat(intent);
+    }
+
+    private void marcarSiAbrirChat(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(RecordatoriosHelper.EXTRA_ABRIR_CHAT, false)) {
+            RecordatoriosHelper.setCoachOpen(getContext(), true);
+        }
+    }
 
     // Estado del permiso de notificaciones ("granted" | "denied").
     @PluginMethod
@@ -109,6 +130,38 @@ public class RecordatoriosPlugin extends Plugin {
         RecordatoriosHelper.cancelarCumple(getContext());
         RecordatoriosHelper.guardarCumple(getContext(), null);
         call.resolve();
+    }
+
+    // Programa (o desactiva) el resumen diario del entrenador {activado, h, m, icono, titulo, cuerpo}.
+    @PluginMethod
+    public void programarCoach(PluginCall call) {
+        try {
+            RecordatoriosHelper.cancelarCoach(getContext());
+            JSObject c = new JSObject();
+            c.put("activado", call.getBoolean("activado", Boolean.TRUE));
+            c.put("h", call.getInt("h", 21));
+            c.put("m", call.getInt("m", 0));
+            c.put("icono", call.getString("icono", "ic_stat_default"));
+            c.put("titulo", call.getString("titulo", ""));
+            c.put("cuerpo", call.getString("cuerpo", ""));
+            c.put("boton", call.getString("boton", ""));
+            RecordatoriosHelper.guardarCoach(getContext(), c.toString());
+            RecordatoriosHelper.programarCoach(getContext());   // no programa si activado=false
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? e.getClass().getName() : e.getMessage());
+        }
+    }
+
+    // Devuelve y CONSUME los flags del entrenador: { pendiente, abrirChat }.
+    @PluginMethod
+    public void estadoCoach(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("pendiente", RecordatoriosHelper.getCoachPending(getContext()));
+        r.put("abrirChat", RecordatoriosHelper.getCoachOpen(getContext()));
+        RecordatoriosHelper.setCoachPending(getContext(), false);
+        RecordatoriosHelper.setCoachOpen(getContext(), false);
+        call.resolve(r);
     }
 
     // Notificación de prueba inmediata.

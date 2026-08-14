@@ -17,6 +17,12 @@ public class AlarmReceiver extends BroadcastReceiver {
             RecordatoriosHelper.programarCumple(ctx);
             return;
         }
+        // Entrenador: resumen diario → mostrar y reprogramar para mañana.
+        if (intent.getBooleanExtra(RecordatoriosHelper.EXTRA_COACH, false)) {
+            RecordatoriosHelper.mostrarCoach(ctx);
+            RecordatoriosHelper.programarCoach(ctx);
+            return;
+        }
         int h = intent.getIntExtra(RecordatoriosHelper.EXTRA_HOUR, -1);
         int m = intent.getIntExtra(RecordatoriosHelper.EXTRA_MIN, -1);
         if (h < 0 || m < 0) return;

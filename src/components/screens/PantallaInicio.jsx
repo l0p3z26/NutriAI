@@ -1,9 +1,10 @@
 import {
-  Camera, Trash2, AlertCircle, Info, RotateCcw, Settings,
+  Camera, Trash2, AlertCircle, Info, RotateCcw, MessageCircle, Menu,
 } from "lucide-react";
 import { T, pct, fmt } from "../../theme.js";
 import { calcConsumido } from "../../lib/nutrition.js";
 import { useT, useIdioma } from "../../lib/i18n.jsx";
+import { emojiTipo } from "../../lib/comidasFijas.js";
 import Boton from "../ui/Boton.jsx";
 import Tarjeta from "../ui/Tarjeta.jsx";
 import Barra from "../ui/Barra.jsx";
@@ -11,7 +12,7 @@ import ChipMacro from "../ui/ChipMacro.jsx";
 import BadgeConfianza from "../ui/BadgeConfianza.jsx";
 import FeedbackSaciedad from "../ui/FeedbackSaciedad.jsx";
 
-export default function PantallaInicio({ perfil, objetivos, comidas, onAnalizar, onEliminarComida, onReiniciarDia, onAjustes, onFeedback }) {
+export default function PantallaInicio({ perfil, objetivos, comidas, onAnalizar, onEliminarComida, onReiniciarDia, onNotificaciones, onMenu, coachNoLeido, onFeedback }) {
   const t = useT();
   const { locale } = useIdioma();
   const con = calcConsumido(comidas);
@@ -32,10 +33,23 @@ export default function PantallaInicio({ perfil, objetivos, comidas, onAnalizar,
             </div>
             <h1 style={{ fontFamily: "'Sora',sans-serif", fontSize: 24, fontWeight: 800, color: T.text }}>{t("inicio.titulo")}</h1>
           </div>
-          <button onClick={onAjustes} aria-label={t("ajustes.titulo")}
-            style={{ background: T.s2, border: `1px solid ${T.border}`, borderRadius: 99, color: T.muted, cursor: "pointer", padding: "8px 10px", display: "flex", alignItems: "center" }}>
-            <Settings size={16} />
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {onNotificaciones && (
+              <button onClick={onNotificaciones} aria-label={t("buzon.titulo")}
+                style={{ position: "relative", background: T.s2, border: `1px solid ${T.border}`, borderRadius: 99, color: T.text, cursor: "pointer", padding: "8px 10px", display: "flex", alignItems: "center" }}>
+                <MessageCircle size={16} />
+                {coachNoLeido && (
+                  <span style={{ position: "absolute", top: 5, right: 6, width: 9, height: 9, borderRadius: 99, background: T.danger, border: `2px solid ${T.s2}` }} />
+                )}
+              </button>
+            )}
+            {onMenu && (
+              <button onClick={onMenu} aria-label={t("menu.titulo")}
+                style={{ background: T.s2, border: `1px solid ${T.border}`, borderRadius: 99, color: T.muted, cursor: "pointer", padding: "8px 10px", display: "flex", alignItems: "center" }}>
+                <Menu size={16} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -107,6 +121,11 @@ export default function PantallaInicio({ perfil, objetivos, comidas, onAnalizar,
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                    {m.mealType && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.accent, background: T.accentBg, border: `1px solid ${T.accentBdr}`, borderRadius: 6, padding: "2px 7px", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {emojiTipo(m.mealType)} {t(`comida.tipo.${m.mealType}`)}
+                      </span>
+                    )}
                     <span style={{ fontSize: 14, fontWeight: 600, color: T.text }}>{m.mealName}</span>
                     <BadgeConfianza nivel={m.confidence} />
                   </div>

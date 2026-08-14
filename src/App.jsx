@@ -2,10 +2,13 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react"
 import { T } from "./theme.js";
 import { calcTargets, edadDesdeFecha } from "./lib/nutrition.js";
 import { sg, ss, hoy, limpiarComidasAntiguas, KEYS } from "./lib/storage.js";
-import { getApiKey } from "./lib/apiKey.js";
-import { useT } from "./lib/i18n.jsx";
+import { getApiKey, migrarModeloAuto } from "./lib/apiKey.js";
+import { getCoachNoLeido, marcarCoachNoLeido, marcarResumenPendiente, crearChatSobreResumen } from "./lib/coach.js";
+import { autoAnadirFrecuentes } from "./lib/comidasFijas.js";
+import { comprobarActualizacion } from "./lib/actualizacion.js";
+import { useT, traducir } from "./lib/i18n.jsx";
 import { BackContext } from "./lib/back.jsx";
-import { inicializarNotif, arranqueNotif, programarCumple } from "./lib/notificaciones.js";
+import { inicializarNotif, arranqueNotif, programarCumple, estadoCoachNotif } from "./lib/notificaciones.js";
 import NavInferior from "./components/screens/NavInferior.jsx";
 
 // Web/APK: no existe el puente de Electron, así que cada usuario trae su propia
@@ -31,6 +34,11 @@ const PantallaClarificacion = lazy(() => import("./components/screens/PantallaCl
 const PantallaResultado     = lazy(() => import("./components/screens/PantallaResultado.jsx"));
 const PantallaRegistro      = lazy(() => import("./components/screens/PantallaRegistro.jsx"));
 const PantallaCrear         = lazy(() => import("./components/screens/PantallaCrear.jsx"));
+const PantallaChat          = lazy(() => import("./components/screens/PantallaChat.jsx"));
+const PantallaNotificaciones = lazy(() => import("./components/screens/PantallaNotificaciones.jsx"));
+const PantallaComidasFijas  = lazy(() => import("./components/screens/PantallaComidasFijas.jsx"));
+const PantallaPreparando    = lazy(() => import("./components/screens/PantallaPreparando.jsx"));
+const MenuLateral           = lazy(() => import("./components/screens/MenuLateral.jsx"));
 
 function Cargando({ texto }) {
   const t = useT();
@@ -49,6 +57,8 @@ export default function App() {
   const [comidas, setComidas] = useState([]);
   const [analisis, setAnalisis] = useState(null);
   const [datosImagen, setDatosImagen] = useState(null);
+  const [tipoComida, setTipoComida] = useState(null);   // tipo elegido al analizar
+  const [chatConvId, setChatConvId] = useState(null);   // conversación a abrir al entrar al chat
   // A qué pantalla volver desde el Resultado: "analyze" (foto/texto) — Crear ya no pasa por aquí.
   const [origenResultado, setOrigenResultado] = useState("analyze");
   // Web/APK: ¿hay clave de Gemini configurada? En Electron siempre true.
@@ -56,8 +66,59 @@ export default function App() {
   // La pantalla de conexión se reutiliza como ajustes (cabecera compacta,
   // opción de borrar). true = abierta desde ajustes; false = onboarding.
   const [conexionAjustes, setConexionAjustes] = useState(false);
+  // Menú lateral (hamburguesa) y punto rojo del entrenador (mensajes sin leer).
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [coachNoLeido, setCoachNoLeido] = useState(false);
+  // ¿Estamos en el flujo de alta (onboarding)? Orden: perfil → conexión →
+  // preparar entrenador → optimización → panel. Lo usamos para encadenar pasos.
+  const [enOnboarding, setEnOnboarding] = useState(false);
+  // Aviso de actualización (consulta a GitHub al arrancar).
+  const [actualizacion, setActualizacion] = useState(null);
+  const [actuDescartada, setActuDescartada] = useState(false);
 
   const abrirConexion = (ajustes = false) => { setConexionAjustes(ajustes); setPantalla("conexion"); };
+
+  // Navegación desde el menú lateral: cierra el menú y va al destino.
+  const navegarMenu = (destino) => {
+    setMenuAbierto(false);
+    if (destino === "conexion") return abrirConexion(true);
+    if (destino === "chat") setChatConvId(null);   // desde el menú, abre la lista
+    setPantalla(destino);   // "chat" | "ajustes" | "comidasfijas"
+  };
+
+  // Desde el buzón de Notificaciones: hablar con el entrenador sobre un resumen.
+  const hablarSobreResumen = async (resumen) => {
+    const conv = await crearChatSobreResumen(resumen);
+    setChatConvId(conv.id);
+    setPantalla("chat");
+  };
+
+  // Tras reanudar/arrancar: si el entrenador dejó su resumen diario (o tocaron
+  // la notificación), enciende el punto rojo, marca el resumen pendiente y —si
+  // fue por tocar la notificación— abre el chat directamente.
+  // `hayPerfil` evita navegar al chat si el usuario aún está en el onboarding
+  // (sin perfil): solo encendemos el punto rojo/resumen, sin cambiar de pantalla.
+  const revisarCoachNotif = useCallback(async (hayPerfil) => {
+    const { pendiente, abrirChat } = await estadoCoachNotif();
+    if (pendiente) {
+      await marcarCoachNoLeido();
+      await marcarResumenPendiente(true);
+      setCoachNoLeido(true);
+    }
+    // El botón "Ver resumen" de la notificación abre el buzón de Notificaciones,
+    // que es donde se genera y aparece el resumen del día.
+    if (abrirChat && hayPerfil) setPantalla("notificaciones");
+  }, []);
+
+  // Comidas frecuentes: añade automáticamente las que tocan hoy (franjas ya
+  // empezadas y no añadidas aún). Se llama al arrancar y al volver a primer plano.
+  const revisarFrecuentes = useCallback(async () => {
+    const nuevas = await autoAnadirFrecuentes();
+    if (!nuevas.length) return;
+    const todas = (await sg(KEYS.COMIDAS)) ?? [];
+    await ss(KEYS.COMIDAS, [...todas, ...nuevas]);
+    setComidas((prev) => [...prev, ...nuevas]);
+  }, []);
 
   // ── Atrás de Android: se comporta como el botón "Volver" ──
   // Las pantallas con sub-vistas (Crear, Ajustes) registran un interceptor con
@@ -74,9 +135,11 @@ export default function App() {
   const perfilRef = useRef(perfil);                   perfilRef.current = perfil;
   const origenRef = useRef(origenResultado);          origenRef.current = origenResultado;
   const conexionAjustesRef = useRef(conexionAjustes); conexionAjustesRef.current = conexionAjustes;
+  const enOnboardingRef = useRef(enOnboarding);       enOnboardingRef.current = enOnboarding;
 
   useEffect(() => {
     (async () => {
+      await migrarModeloAuto();   // mueve modelos por defecto antiguos a "auto"
       let p = await sg(KEYS.PERFIL);
       let t = await sg(KEYS.OBJETIVOS);
       // Limpieza automática: comidas con más de 90 días
@@ -105,8 +168,21 @@ export default function App() {
       } else {
         setPantalla("bienvenida");
       }
+      // Al final de la carga (para ganar la carrera con la pantalla inicial):
+      // si se abrió tocando la notificación del entrenador, ir al chat.
+      await revisarCoachNotif(!!(p && t));
+      if (p && t) await revisarFrecuentes();   // comidas frecuentes de hoy
     })();
-  }, []);
+  }, [revisarCoachNotif, revisarFrecuentes]);
+
+  // Aviso de actualización: comprobar una vez al arrancar (solo Android).
+  useEffect(() => { comprobarActualizacion().then(setActualizacion); }, []);
+
+  // Punto rojo del entrenador: se refresca al volver al panel (p. ej. tras salir
+  // del chat, que ya marcó como leído) y al arrancar.
+  useEffect(() => {
+    if (pantalla === "dashboard") { getCoachNoLeido().then(setCoachNoLeido); setEnOnboarding(false); }
+  }, [pantalla]);
 
   // Si una llamada a Gemini falla por clave inválida/revocada, gemini-client.js
   // dispara este evento y volvemos a la pantalla de conexión.
@@ -131,12 +207,12 @@ export default function App() {
         }
         const p = pantallaRef.current;
         if (p === "dashboard" || p === "bienvenida" || p === "cargando") { CapApp.exitApp(); return; }
-        if (["analyze", "crear", "summary", "cuenta", "ajustes"].includes(p)) { setPantalla("dashboard"); return; }
+        if (["analyze", "crear", "summary", "cuenta", "ajustes", "chat", "notificaciones", "comidasfijas"].includes(p)) { setPantalla("dashboard"); return; }
         if (p === "clarificacion") { setPantalla("analyze"); return; }
         if (p === "resultado") { setPantalla(origenRef.current); return; }
-        if (p === "optimizacion") { setPantalla("perfil"); return; }
-        if (p === "perfil" || p === "profile_edit") { setPantalla(perfilRef.current ? "cuenta" : "bienvenida"); return; }
-        if (p === "conexion") { setPantalla(conexionAjustesRef.current ? "ajustes" : (perfilRef.current ? "dashboard" : "bienvenida")); return; }
+        if (p === "optimizacion") { setPantalla("dashboard"); return; }
+        if (p === "perfil" || p === "profile_edit") { setPantalla(enOnboardingRef.current ? "bienvenida" : (perfilRef.current ? "cuenta" : "bienvenida")); return; }
+        if (p === "conexion") { setPantalla(conexionAjustesRef.current ? "ajustes" : (enOnboardingRef.current ? "perfil" : (perfilRef.current ? "dashboard" : "bienvenida"))); return; }
       });
       quitar = () => handle.remove();
     })();
@@ -149,17 +225,19 @@ export default function App() {
   // el receptor de arranque del plugin).
   useEffect(() => {
     arranqueNotif();
+    // El arranque en frío por notificación lo maneja el efecto de carga inicial
+    // (para navegar al chat en el orden correcto). Aquí solo el ciclo de vida.
     let quitar;
     (async () => {
       if (!(typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.())) return;
       const { App: CapApp } = await import("@capacitor/app");
       const handle = await CapApp.addListener("appStateChange", ({ isActive }) => {
-        if (isActive) inicializarNotif();
+        if (isActive) { inicializarNotif(); revisarCoachNotif(!!perfilRef.current); getCoachNoLeido().then(setCoachNoLeido); if (perfilRef.current) revisarFrecuentes(); }
       });
       quitar = () => handle.remove();
     })();
     return () => { if (quitar) quitar(); };
-  }, []);
+  }, [revisarCoachNotif, revisarFrecuentes]);
 
   const guardarPerfil = async p => {
     const t = calcTargets(p);
@@ -167,6 +245,13 @@ export default function App() {
     await ss(KEYS.PERFIL, p);
     await ss(KEYS.OBJETIVOS, t);
     if (p.birthDate) programarCumple(p.birthDate);   // notificación de cumpleaños
+    // Onboarding: tras el perfil toca conectar la IA (web/APK). En edición
+    // (fuera del onboarding) o escritorio, directo al panel.
+    if (enOnboarding) {
+      if (esWeb && !claveOk) return setPantalla("conexion");
+      if (esWeb) return setPantalla("preparando");           // ya hay clave
+      return setPantalla(esAndroid ? "optimizacion" : "dashboard");
+    }
     setPantalla("dashboard");
   };
 
@@ -186,12 +271,15 @@ export default function App() {
   };
 
   const guardarComida = async comida => {
-    const nuevas = [...comidas, comida];
+    // El tipo de comida puede venir en el propio objeto (comida fija) o del
+    // selector del análisis (tipoComida). El del objeto tiene prioridad.
+    const c = { ...comida, mealType: comida.mealType || tipoComida || null };
+    const nuevas = [...comidas, c];
     setComidas(nuevas);
     const todas = (await sg(KEYS.COMIDAS)) ?? [];
     const pasadas = todas.filter(m => new Date(m.createdAt).toDateString() !== hoy());
     await ss(KEYS.COMIDAS, [...pasadas, ...nuevas]);
-    setAnalisis(null); setPantalla("dashboard");
+    setAnalisis(null); setTipoComida(null); setPantalla("dashboard");
   };
 
   const eliminarComida = async id => {
@@ -215,17 +303,17 @@ export default function App() {
   };
 
   const navegar = s => {
-    if (s === "analyze") { setAnalisis(null); setDatosImagen(null); }
+    if (s === "analyze") { setAnalisis(null); setDatosImagen(null); setTipoComida(null); }
     setPantalla(s);
   };
 
   const mostrarNav = perfil &&
-    !["bienvenida", "perfil", "profile_edit", "cargando", "clarificacion", "conexion", "optimizacion", "cuenta", "ajustes"].includes(pantalla);
+    !["bienvenida", "perfil", "profile_edit", "cargando", "clarificacion", "conexion", "optimizacion", "cuenta", "ajustes", "chat", "notificaciones", "comidasfijas", "preparando"].includes(pantalla);
 
   const renderPantalla = () => {
     if (pantalla === "cargando") return <Cargando />;
     if (pantalla === "bienvenida") return (
-      <PantallaBienvenida onEmpezar={() => (esWeb && !claveOk) ? abrirConexion(false) : setPantalla("perfil")} />
+      <PantallaBienvenida onEmpezar={() => { setEnOnboarding(true); setPantalla("perfil"); }} />
     );
     if (pantalla === "conexion") return (
       <PantallaConexion
@@ -233,15 +321,15 @@ export default function App() {
         onListo={() => {
           setClaveOk(true);
           if (conexionAjustes) return setPantalla("ajustes");
-          if (perfil) return setPantalla("dashboard");
-          // Onboarding en Android: sugerimos optimización antes de crear el perfil.
-          return setPantalla(esAndroid ? "optimizacion" : "perfil");
+          // Onboarding: tras conectar la IA, el entrenador se prepara con el perfil.
+          if (enOnboarding) return setPantalla("preparando");
+          return setPantalla("dashboard");   // re-añadir clave (el perfil ya existe)
         }}
-        onVolver={conexionAjustes ? () => setPantalla("ajustes") : (perfil ? () => setPantalla("dashboard") : () => setPantalla("bienvenida"))}
+        onVolver={conexionAjustes ? () => setPantalla("ajustes") : (enOnboarding ? () => setPantalla("perfil") : (perfil ? () => setPantalla("dashboard") : () => setPantalla("bienvenida")))}
       />
     );
     if (pantalla === "optimizacion") return (
-      <PantallaOptimizacion onContinuar={() => setPantalla("perfil")} />
+      <PantallaOptimizacion onContinuar={() => setPantalla("dashboard")} />
     );
     if (pantalla === "perfil" || pantalla === "profile_edit") return (
       <PantallaPerfil
@@ -270,23 +358,50 @@ export default function App() {
         onAnalizar={() => setPantalla("analyze")}
         onEliminarComida={eliminarComida}
         onReiniciarDia={reiniciarDia}
-        onAjustes={() => setPantalla("ajustes")}
+        onNotificaciones={() => setPantalla("notificaciones")}
+        onMenu={() => setMenuAbierto(true)}
+        coachNoLeido={coachNoLeido}
         onFeedback={manejarFeedback}
+      />
+    );
+    if (pantalla === "comidasfijas") return (
+      <PantallaComidasFijas onVolver={() => setPantalla("dashboard")} />
+    );
+    if (pantalla === "chat") return (
+      <PantallaChat
+        perfil={perfil} objetivos={objetivos} comidas={comidas}
+        convInicial={chatConvId}
+        onVolver={() => setPantalla("dashboard")}
+      />
+    );
+    if (pantalla === "notificaciones") return (
+      <PantallaNotificaciones
+        perfil={perfil} objetivos={objetivos} comidas={comidas}
+        onHablar={hablarSobreResumen}
+        onVolver={() => setPantalla("dashboard")}
+      />
+    );
+    if (pantalla === "preparando") return (
+      <PantallaPreparando
+        perfil={perfil} objetivos={objetivos}
+        onContinuar={() => setPantalla(esAndroid ? "optimizacion" : "dashboard")}
       />
     );
     if (pantalla === "analyze") return (
       <PantallaAnalizar
         perfil={perfil}
         onVolver={() => setPantalla("dashboard")}
-        onResultado={(res, b64, mime, nota, macros) => {
+        onResultado={(res, b64, mime, nota, macros, tipo) => {
           setAnalisis(res);
           setDatosImagen({ b64, mime, notaOriginal: nota, macrosUsuario: macros });
+          setTipoComida(tipo ?? null);
           setOrigenResultado("analyze");
           setPantalla("resultado");
         }}
-        onClarificacion={(res, b64, mime, nota, macros) => {
+        onClarificacion={(res, b64, mime, nota, macros, tipo) => {
           setAnalisis(res);
           setDatosImagen({ b64, mime, notaOriginal: nota, macrosUsuario: macros });
+          setTipoComida(tipo ?? null);
           setOrigenResultado("analyze");
           setPantalla("clarificacion");
         }}
@@ -330,10 +445,33 @@ export default function App() {
         background: T.bg, position: "relative",
         fontFamily: "'DM Sans', sans-serif", color: T.text,
       }}>
+        {actualizacion && !actuDescartada && pantalla !== "cargando" && (
+          <div style={{ position: "sticky", top: 0, zIndex: 300, background: T.accent, color: "#06080F", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800 }}>{traducir("actualizar.titulo")}{actualizacion.version ? ` (v${actualizacion.version})` : ""}</div>
+              <div style={{ fontSize: 12, opacity: .85, lineHeight: 1.4 }}>{actualizacion.mensaje || traducir("actualizar.sub")}</div>
+            </div>
+            <button onClick={() => { try { window.open(actualizacion.url, "_system"); } catch { /* no-op */ } }}
+              style={{ flexShrink: 0, background: "#06080F", color: T.accent, border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              {traducir("actualizar.boton")}
+            </button>
+            <button onClick={() => setActuDescartada(true)} aria-label={traducir("actualizar.cerrar")}
+              style={{ flexShrink: 0, background: "transparent", color: "#06080F", border: "none", cursor: "pointer", padding: 4, display: "flex", fontWeight: 800 }}>
+              ✕
+            </button>
+          </div>
+        )}
         <Suspense fallback={<Cargando />}>
           {renderPantalla()}
         </Suspense>
         {mostrarNav && <NavInferior pantalla={pantalla} setPantalla={navegar} />}
+        <Suspense fallback={null}>
+          <MenuLateral
+            abierto={menuAbierto}
+            onCerrar={() => setMenuAbierto(false)}
+            onNavegar={navegarMenu}
+          />
+        </Suspense>
       </div>
     </BackContext.Provider>
   );

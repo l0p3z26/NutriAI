@@ -4,12 +4,14 @@ import { T } from "../../theme.js";
 import { useT } from "../../lib/i18n.jsx";
 import { analizarIA } from "../../lib/ai.js";
 import { comprimirImagen } from "../../lib/image.js";
+import { TIPOS_COMIDA } from "../../lib/comidasFijas.js";
 import Boton from "../ui/Boton.jsx";
 import PreguntaCalorias from "../ui/PreguntaCalorias.jsx";
 
 export default function PantallaAnalizar({ onVolver, onResultado, onClarificacion }) {
   const t = useT();
   const [modo, setModo] = useState("foto");             // "foto" | "texto"
+  const [tipo, setTipo] = useState(null);               // desayuno/comida/merienda/cena/postre
   const [prevista, setPrevista] = useState(null);
   const [b64, setB64] = useState(null);
   const [mime, setMime] = useState(null);
@@ -83,7 +85,8 @@ export default function PantallaAnalizar({ onVolver, onResultado, onClarificacio
             accuracyTips: [],
             healthNotes: [t("data.manual_health")],
           };
-          onResultado(res, null, null, descripcion, macrosFinal);
+          res.mealType = tipo;
+          onResultado(res, null, null, descripcion, macrosFinal, tipo);
           return;
         }
       }
@@ -94,10 +97,11 @@ export default function PantallaAnalizar({ onVolver, onResultado, onClarificacio
       const notaFinal  = modo === "foto" ? nota : descripcion;
 
       const res = await analizarIA(b64Final, mimeActual, notaFinal, macrosFinal);
+      res.mealType = tipo;
       if (res.confidence === "low") {
-        onClarificacion(res, b64Final, mimeActual, notaFinal, macrosFinal);
+        onClarificacion(res, b64Final, mimeActual, notaFinal, macrosFinal, tipo);
       } else {
-        onResultado(res, b64Final, mimeActual, notaFinal, macrosFinal);
+        onResultado(res, b64Final, mimeActual, notaFinal, macrosFinal, tipo);
       }
     } catch (e) {
       const msg = e?.message || String(e) || t("analizar.err_generico");
@@ -142,6 +146,28 @@ export default function PantallaAnalizar({ onVolver, onResultado, onClarificacio
               {label}
             </button>
           ))}
+        </div>
+
+        {/* ── Tipo de comida ── */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: T.muted, fontWeight: 600, marginBottom: 6 }}>{t("comida.tipo_label")}</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {TIPOS_COMIDA.map(({ id, emoji }) => {
+              const activo = tipo === id;
+              return (
+                <button key={id} onClick={() => setTipo(activo ? null : id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "8px 12px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                    background: activo ? T.accentBg : T.s2,
+                    border: `1px solid ${activo ? T.accentBdr : T.border}`,
+                    color: activo ? T.accent : T.muted, fontWeight: activo ? 700 : 500, fontSize: 13,
+                  }}>
+                  <span>{emoji}</span>{t(`comida.tipo.${id}`)}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── Zona de entrada según modo ── */}

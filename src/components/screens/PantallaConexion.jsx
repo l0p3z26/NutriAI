@@ -5,7 +5,8 @@ import { useT } from "../../lib/i18n.jsx";
 import Boton from "../ui/Boton.jsx";
 import Selector from "../ui/Selector.jsx";
 import {
-  getApiKey, setApiKey, clearApiKey, getModelo, setModelo,
+  getApiKey, setApiKey, getModelo, setModelo,
+  getApiKeys, addApiKey, removeApiKey, estadoClave,
   validarClaveYModelo, MODELOS_GEMINI, MODELO_PERSONALIZADO, MODELO_POR_DEFECTO,
 } from "../../lib/apiKey.js";
 
@@ -26,7 +27,11 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
   const [modeloManual, setModeloManual] = useState("");                 // ID a mano si "Otro"
   const [validando, setValidando] = useState(false);
   const [error, setError] = useState("");
+  const [okMsg, setOkMsg] = useState("");
   const [cargado, setCargado] = useState(false);
+  const [claves, setClaves] = useState([]);   // lista completa (modo ajustes)
+
+  const recargarClaves = async () => setClaves(await getApiKeys());
 
   // Precarga: en modo ajustes (o si el usuario ya tenía clave) rellenamos estado.
   useEffect(() => {
@@ -35,6 +40,7 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
       setClaveGuardada(k);
       if (esDeLista(m)) { setOpcionModelo(m); }
       else { setOpcionModelo(MODELO_PERSONALIZADO); setModeloManual(m); }
+      await recargarClaves();
       setCargado(true);
     })();
   }, []);
@@ -44,35 +50,57 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
   const claveEfectiva = clave.trim() || claveGuardada;
 
   const validarYContinuar = async () => {
-    setError("");
-    if (!claveEfectiva) { setError(t("conexion.err_clave")); return; }
+    setError(""); setOkMsg("");
     if (opcionModelo === MODELO_PERSONALIZADO && !modeloManual.trim()) {
       setError(t("conexion.err_modelo")); return;
     }
-    setValidando(true);
-    const res = await validarClaveYModelo({ apiKey: claveEfectiva, modelo: modeloElegido });
-    if (!res.ok) { setError(res.error); setValidando(false); return; }
-    await setApiKey(claveEfectiva);
+
+    // Onboarding: valida una clave para empezar y continúa.
+    if (!modoAjustes) {
+      if (!claveEfectiva) { setError(t("conexion.err_clave")); return; }
+      setValidando(true);
+      const res = await validarClaveYModelo({ apiKey: claveEfectiva, modelo: modeloElegido });
+      if (!res.ok) { setError(res.error); setValidando(false); return; }
+      await addApiKey(claveEfectiva);
+      await setModelo(modeloElegido);
+      setValidando(false);
+      onListo?.();
+      return;
+    }
+
+    // Ajustes: guarda el modelo y AÑADE la clave escrita (si hay) a la lista.
     await setModelo(modeloElegido);
-    setValidando(false);
-    onListo?.();
+    const nueva = clave.trim();
+    if (!nueva) { await recargarClaves(); setOkMsg(t("conexion.modelo_guardado")); return; }
+    setValidando(true);
+    const res = await validarClaveYModelo({ apiKey: nueva, modelo: modeloElegido });
+    if (!res.ok) { setError(res.error); setValidando(false); return; }
+    await addApiKey(nueva);
+    await recargarClaves();
+    setClave(""); setValidando(false);
+    setOkMsg(t("conexion.clave_anadida"));
   };
 
-  const borrarClave = async () => {
-    await clearApiKey();
-    setClave(""); setClaveGuardada(""); setError("");
+  const quitarClave = async (key) => {
+    await removeApiKey(key);
+    await recargarClaves();
   };
 
   if (!cargado) return null;
 
   const tieneClave = !!claveGuardada;
-  const placeholderClave = tieneClave && !clave ? enmascarar(claveGuardada) : "AIza…";
+  const placeholderClave = (!modoAjustes && tieneClave && !clave) ? enmascarar(claveGuardada) : "AIza…";
 
   // Etiquetas de modelo traducidas (los nombres de producto se mantienen; solo
   // se traduce el sufijo "(recomendado)" y la opción "Otro").
   const opcionesModelo = MODELOS_GEMINI.map((o) => {
     if (o.v === MODELO_PERSONALIZADO) return { v: o.v, l: t("conexion.modelo_otro") };
-    if (o.v === MODELO_POR_DEFECTO)   return { v: o.v, l: `Gemini 3.5 Flash (${t("conexion.recomendado")})` };
+    // Para el modelo por defecto: nombre real (de MODELOS_GEMINI) + "(recomendado)"
+    // traducido. Antes estaba fijado a "Gemini 3.5 Flash", que quedó obsoleto.
+    if (o.v === MODELO_POR_DEFECTO) {
+      const base = o.l.replace(/\s*\([^)]*\)\s*$/, "");
+      return { v: o.v, l: `${base} (${t("conexion.recomendado")})` };
+    }
     return { v: o.v, l: o.l };
   });
 
@@ -152,9 +180,37 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
             dangerouslySetInnerHTML={{ __html: t("conexion.aviso") }} />
         </div>
 
+        {/* Lista de claves (modo ajustes): estado + rotación automática */}
+        {modoAjustes && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: T.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: .8, marginBottom: 8 }}>
+              {t("conexion.claves_titulo")}
+            </div>
+            {claves.length === 0 ? (
+              <div style={{ fontSize: 13, color: T.dim, padding: "2px 2px 4px" }}>{t("conexion.sin_claves")}</div>
+            ) : claves.map((k) => {
+              const est = estadoClave(k);
+              const col = est === "activa" ? T.accent : est === "agotada" ? T.warn : T.danger;
+              const bg = est === "activa" ? T.accentBg : est === "agotada" ? T.warnBg : T.dangerBg;
+              return (
+                <div key={k.key} style={{ display: "flex", alignItems: "center", gap: 10, background: T.surf, border: `1px solid ${T.border}`, borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
+                  <KeyRound size={15} color={T.muted} style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 13, color: T.text, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{enmascarar(k.key)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: col, background: bg, border: `1px solid ${col}44`, borderRadius: 7, padding: "3px 7px", flexShrink: 0 }}>{t(`conexion.estado.${est}`)}</span>
+                  <button onClick={() => quitarClave(k.key)} aria-label={t("conexion.quitar")}
+                    style={{ background: T.dangerBg, border: `1px solid ${T.danger}44`, borderRadius: 8, color: T.danger, cursor: "pointer", padding: "5px 7px", display: "flex", flexShrink: 0 }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 11, color: T.dim, marginTop: 2, lineHeight: 1.5 }}>{t("conexion.claves_nota")}</div>
+          </div>
+        )}
+
         {/* Campo clave */}
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: T.muted, fontWeight: 600, marginBottom: 5 }}>{t("conexion.clave_label")}</div>
+          <div style={{ fontSize: 12, color: T.muted, fontWeight: 600, marginBottom: 5 }}>{modoAjustes ? t("conexion.anadir_otra") : t("conexion.clave_label")}</div>
           <div style={{ position: "relative" }}>
             <input
               type={verClave ? "text" : "password"}
@@ -176,18 +232,18 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
               {verClave ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {tieneClave && !clave && (
+          {!modoAjustes && tieneClave && !clave && (
             <div style={{ fontSize: 11, color: T.dim, marginTop: 4 }}>
               {t("conexion.ya_clave")}
             </div>
           )}
         </div>
 
-        {/* Desplegable de modelo */}
+        {/* Desplegable de modelo (se guarda solo al elegir uno de la lista) */}
         <Selector
           etiqueta={t("conexion.modelo_label")}
           v={opcionModelo}
-          set={setOpcionModelo}
+          set={(v) => { setOpcionModelo(v); if (v !== MODELO_PERSONALIZADO) setModelo(v); }}
           opciones={opcionesModelo}
         />
         {opcionModelo === MODELO_PERSONALIZADO && (
@@ -218,6 +274,13 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
             <div style={{ fontSize: 13, color: T.danger, lineHeight: 1.5 }}>{error}</div>
           </div>
         )}
+        {/* Éxito (modo ajustes) */}
+        {okMsg && (
+          <div style={{ background: T.accentBg, border: `1px solid ${T.accentBdr}`, borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8 }}>
+            <CheckCircle2 size={16} color={T.accent} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ fontSize: 13, color: T.accent, lineHeight: 1.5 }}>{okMsg}</div>
+          </div>
+        )}
       </div>
 
       {/* Acciones */}
@@ -227,14 +290,8 @@ export default function PantallaConexion({ onListo, onVolver, modoAjustes = fals
           disabled={validando}
           icono={validando ? undefined : <CheckCircle2 size={16} />}
         >
-          {validando ? t("conexion.validando") : (modoAjustes ? t("conexion.guardar") : t("conexion.continuar"))}
+          {validando ? t("conexion.validando") : (modoAjustes ? t("conexion.anadir_clave") : t("conexion.continuar"))}
         </Boton>
-        {modoAjustes && tieneClave && (
-          <button onClick={borrarClave}
-            style={{ width: "100%", marginTop: 10, background: "none", border: "none", color: T.muted, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 8 }}>
-            <Trash2 size={13} /> {t("conexion.borrar")}
-          </button>
-        )}
         <p style={{ textAlign: "center", fontSize: 11, color: T.dim, marginTop: 12, lineHeight: 1.5 }}>
           {t("conexion.privacidad")}
         </p>

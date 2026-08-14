@@ -8,7 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 // importa antes de que main.js ejecute dotenv.config(), así que las
 // variables de entorno del .env todavía no existirían. Se resuelve de forma
 // perezosa, en cada llamada.
-const getModelId = () => process.env.GEMINI_MODEL || "gemini-3.5-flash";
+const getModelId = () => process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
 const fmt = (n) => (Number.isFinite(n) ? Math.round(n) : 0);
 

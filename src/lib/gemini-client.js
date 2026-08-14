@@ -10,7 +10,10 @@
 // IMPORTANTE: este archivo debe mantenerse en paralelo con electron/gemini.js
 // (mismos prompts, mismo esquema, mismo modelo). Si cambias uno, cambia el otro.
 import { GoogleGenAI } from "@google/genai";
-import { getApiKey, getModelo, esErrorDeClave } from "./apiKey.js";
+import {
+  getApiKeys, getActiveApiKey, getModelo,
+  esErrorDeClave, esErrorDeCuota, marcarAgotada, marcarInvalida,
+} from "./apiKey.js";
 import { traducir, getInstruccionIdiomaIA } from "./i18n.jsx";
 
 const fmt = (n) => (Number.isFinite(n) ? Math.round(n) : 0);
@@ -124,50 +127,59 @@ const ETIQUETAS_ENTRENO = {
   sports: "deportes de equipo", running: "running/atletismo", mixed: "mixto", other: "",
 };
 
-// El cliente se cachea, pero se reconstruye si el usuario cambia su clave
-// (p. ej. desde Ajustes → Conexión). Por eso guardamos la clave con la que se
-// creó y comparamos en cada llamada.
-let _client = null;
-let _clientKey = null;
-async function getClient() {
-  const apiKey = await getApiKey();
-  if (!apiKey) {
-    throw new Error(traducir("err.falta_clave"));
+// Un cliente por clave (cacheado). Se crea bajo demanda al rotar.
+const _clients = new Map();
+function clientPara(apiKey) {
+  let c = _clients.get(apiKey);
+  if (!c) { c = new GoogleGenAI({ apiKey }); _clients.set(apiKey, c); }
+  return c;
+}
+
+// Ejecuta `fn(cliente)` rotando entre las claves usables:
+//  · error de CUOTA (429) → marca la clave agotada y prueba la siguiente.
+//  · clave INVÁLIDA        → la marca inválida y prueba la siguiente.
+//  · otro error            → se propaga (no rota).
+// Si no queda ninguna clave usable, lanza un error claro y avisa a la app.
+async function conRotacion(fn) {
+  let ultimo = null;
+  for (let i = 0; i < 50; i++) {
+    const apiKey = await getActiveApiKey();
+    if (!apiKey) {
+      const hayClaves = (await getApiKeys()).length > 0;
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(hayClaves ? "nutriai:claves-agotadas" : "nutriai:clave-invalida"));
+      }
+      throw new Error(traducir(hayClaves ? "err.todas_agotadas" : "err.falta_clave"));
+    }
+    try {
+      return await fn(clientPara(apiKey));
+    } catch (e) {
+      ultimo = e;
+      if (esErrorDeCuota(e)) { await marcarAgotada(apiKey); continue; }
+      if (esErrorDeClave(e)) { await marcarInvalida(apiKey); continue; }
+      console.error("[NutriAI] Error de la API de Gemini:", e?.message || String(e));
+      throw new Error(e?.message || String(e) || "Error desconocido al llamar a Gemini.");
+    }
   }
-  if (!_client || _clientKey !== apiKey) {
-    _client = new GoogleGenAI({ apiKey });
-    _clientKey = apiKey;
-  }
-  return _client;
+  throw ultimo || new Error(traducir("err.todas_agotadas"));
 }
 
 async function llamarGeminiJSON({ systemPrompt, parts, schema, maxOutputTokens = 2048 }) {
-  const ai = await getClient();
-  let response;
-  try {
-    response = await ai.models.generateContent({
-      model: await getModelo(),
-      contents: [{ role: "user", parts }],
-      config: {
-        // Añadimos la directiva de idioma para que la IA responda en el idioma
-        // del usuario (nombres de comida, resúmenes, consejos, notas, etc.).
-        systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
-        responseMimeType: "application/json",
-        responseSchema: schema,
-        maxOutputTokens,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    });
-  } catch (e) {
-    const msg = e?.message || String(e) || "Error desconocido al llamar a Gemini.";
-    // Si la clave dejó de valer (revocada / sin permiso), avisamos a la app
-    // para que lleve al usuario de vuelta a la pantalla de conexión.
-    if (esErrorDeClave(e) && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("nutriai:clave-invalida"));
-    }
-    console.error("[NutriAI] Error de la API de Gemini:", msg);
-    throw new Error(msg);
-  }
+  const modelo = await getModelo();
+  const response = await conRotacion((ai) => ai.models.generateContent({
+    model: modelo,
+    contents: [{ role: "user", parts }],
+    config: {
+      // Directiva de idioma para que la IA responda en el idioma del usuario.
+      systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
+      responseMimeType: "application/json",
+      responseSchema: schema,
+      maxOutputTokens,
+      // NB: NO fijamos thinkingConfig. Los modelos Gemini 3.x rechazan
+      // (INVALID_ARGUMENT) desactivar el "thinking" (budget 0) cuando se pide
+      // salida estructurada (responseSchema). Dejamos que el modelo decida.
+    },
+  }));
 
   const texto = response.text;
   const finishReason = response.candidates?.[0]?.finishReason;
@@ -182,6 +194,54 @@ async function llamarGeminiJSON({ systemPrompt, parts, schema, maxOutputTokens =
   } catch {
     console.error("[NutriAI] Respuesta de Gemini no es JSON válido (finishReason:", finishReason, "):", texto);
     throw new Error(traducir("err.no_json"));
+  }
+}
+
+// ── Chat del entrenador personal ─────────────────────────────────────────────
+// La respuesta llega como JSON: el mensaje para el usuario + hechos nuevos que
+// aprender sobre él + si ha reportado una comida social puntual hoy. Así, en una
+// sola llamada, respondemos y actualizamos la ficha (memoria.js) sin gasto extra.
+const COACH_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    reply: { type: "STRING" },
+    memory_add: { type: "ARRAY", items: { type: "STRING" } },
+    social_meal_today: { type: "BOOLEAN" },
+  },
+  required: ["reply", "memory_add", "social_meal_today"],
+};
+
+// `contents` es el historial multi-turno de Gemini: [{ role:"user"|"model", parts:[{text}] }].
+export async function chatCoach({ systemPrompt, contents, maxOutputTokens = 1024 }) {
+  const modelo = await getModelo();
+  const response = await conRotacion((ai) => ai.models.generateContent({
+    model: modelo,
+    contents,
+    config: {
+      systemInstruction: `${systemPrompt} ${getInstruccionIdiomaIA()}`,
+      responseMimeType: "application/json",
+      responseSchema: COACH_SCHEMA,
+      maxOutputTokens,
+      // Sin thinkingConfig: Gemini 3.x rechaza budget 0 con salida estructurada.
+    },
+  }));
+
+  const texto = response.text;
+  const finishReason = response.candidates?.[0]?.finishReason;
+  if (!texto) {
+    if (finishReason === "MAX_TOKENS") throw new Error(traducir("err.respuesta_larga"));
+    throw new Error(traducir("err.sin_resultado"));
+  }
+  try {
+    const o = JSON.parse(texto);
+    return {
+      reply: typeof o.reply === "string" ? o.reply : "",
+      memory_add: Array.isArray(o.memory_add) ? o.memory_add : [],
+      social_meal_today: !!o.social_meal_today,
+    };
+  } catch {
+    // Si por lo que sea no vino JSON válido, usamos el texto crudo como respuesta.
+    return { reply: texto, memory_add: [], social_meal_today: false };
   }
 }
 

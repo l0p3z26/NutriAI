@@ -190,11 +190,55 @@ export async function cancelarCumple() {
   try { await Recordatorios.cancelarCumple(); } catch { /* no-op */ }
 }
 
+// ── Entrenador personal: resumen diario ───────────────────────────────────────
+// Config propia (independiente de los recordatorios de comidas). Viene activada
+// por defecto a las 21:00: cada día, a esa hora, el entrenador avisa de que tiene
+// un resumen para el usuario. El resumen se genera al abrir el chat (coach.js).
+export const HORA_COACH_POR_DEFECTO = { h: 21, m: 0 };
+
+export async function getConfigCoach() {
+  const g = await sg(KEYS.NOTIF_COACH);
+  if (!g || typeof g !== "object") return { activado: true, ...HORA_COACH_POR_DEFECTO };
+  return {
+    activado: g.activado !== false,
+    h: Number.isInteger(g.h) ? g.h : HORA_COACH_POR_DEFECTO.h,
+    m: Number.isInteger(g.m) ? g.m : HORA_COACH_POR_DEFECTO.m,
+  };
+}
+
+export async function setConfigCoach(cfg) { await ss(KEYS.NOTIF_COACH, cfg); }
+
+// (Re)programa la notificación diaria del entrenador según su config.
+export async function reprogramarCoach(config) {
+  if (!soportaNotificaciones()) return;
+  const c = config || (await getConfigCoach());
+  try {
+    await Recordatorios.programarCoach({
+      activado: c.activado,
+      h: c.h, m: c.m,
+      icono: await iconoNotif(),
+      titulo: traducir("notif.coach.titulo"),
+      cuerpo: traducir("notif.coach.cuerpo"),
+      boton: traducir("notif.coach.boton"),
+    });
+  } catch { /* no-op */ }
+}
+
+// Lee y CONSUME los flags nativos del entrenador tras reanudar la app.
+export async function estadoCoachNotif() {
+  if (!soportaNotificaciones()) return { pendiente: false, abrirChat: false };
+  try {
+    const r = await Recordatorios.estadoCoach();
+    return { pendiente: !!r.pendiente, abrirChat: !!r.abrirChat };
+  } catch { return { pendiente: false, abrirChat: false }; }
+}
+
 // Reconcilia con la config guardada. NO pide permiso (para no molestar al
 // reanudar la app o tras restaurar una copia).
 export async function inicializarNotif() {
   if (!soportaNotificaciones()) return;
   await reprogramar();
+  await reprogramarCoach();
 }
 
 // Arranque de la app: si nunca se respondió al permiso, muéstralo (1ª vez), y
@@ -202,11 +246,15 @@ export async function inicializarNotif() {
 export async function arranqueNotif() {
   if (!soportaNotificaciones()) return;
   const cfg = await getConfigNotif();
-  if (!cfg.activadas) { await cancelarTodas(); return; }
   try {
     let ok = await permisoConcedido();
     if (!ok) ok = await pedirPermiso();
-    if (ok) await reprogramar(cfg);
+    if (ok) {
+      await reprogramar(cfg);        // reprogramar() ya cancela si están desactivadas
+      await reprogramarCoach();      // el resumen del entrenador es independiente
+    } else {
+      await cancelarTodas();
+    }
   } catch { /* no-op */ }
 }
 
